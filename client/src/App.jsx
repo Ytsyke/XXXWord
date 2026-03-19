@@ -8,9 +8,9 @@ import React, { useState, useEffect } from 'react';
 function App() {
   // Проверка авторизации
   const isAuthenticated = !!localStorage.getItem('token');
-//basename="/XXXWord"
+
   return (
-    <Router>
+    <Router basename="/XXXWord">
       <div className="App">
         {/* Показываем синюю шапку Word только если юзер вошел */}
         {isAuthenticated && (
