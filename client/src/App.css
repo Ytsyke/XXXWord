@@ -1,0 +1,88 @@
+/* Общий фон как в Word */
+.App {
+  background-color: #f3f2f1; /* Светло-серый офисный фон */
+  min-height: 100vh;
+}
+
+.editor-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 20px;
+}
+
+/* Панель инструментов */
+.word-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: white;
+  padding: 8px 20px;
+  border-bottom: 1px solid #edebe9;
+  width: 100%;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.word-toolbar button {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 6px;
+  border-radius: 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  color: #323130;
+}
+
+.word-toolbar button:hover {
+  background: #f3f2f1;
+}
+
+.word-toolbar button.is-active {
+  background: #edebe9;
+  border-color: #c8c6c4;
+}
+
+.v-divider {
+  width: 1px;
+  height: 24px;
+  background: #edebe9;
+  margin: 0 10px;
+}
+
+/* Эффект листа A4 */
+.editor-container {
+  background: white;
+  width: 210mm; /* Стандарт A4 */
+  min-height: 297mm;
+  margin: 40px auto;
+  padding: 20mm; /* Отступы как в документах */
+  box-shadow: 0 0 15px rgba(0,0,0,0.1);
+  border: 1px solid #edebe9;
+}
+
+.ProseMirror {
+  outline: none;
+  font-family: "Calibri", "Arial", sans-serif;
+  font-size: 11pt;
+  color: #000000; /* Настоящий черный */
+  line-height: 1.5;
+  text-align: left;
+}
+
+.ProseMirror p {
+  margin: 0;
+  color: #000000;
+}
+
+.ProseMirror h1, .ProseMirror h2, .ProseMirror p {
+  color: #000000;
+  margin-bottom: 10px;
+}
+
+.ProseMirror ::selection {
+  background-color: #cce2ff;
+}
