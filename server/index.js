@@ -7,8 +7,13 @@ const Document = require('./models/Document');
 
 const app = express();
 
-// Настройки
-app.use(cors());
+// 1. Настройки CORS (лучше объединить в одном месте)
+app.use(cors({
+    origin: ["https://ytsyke.github.io", "http://localhost:3000"], // Разрешаем и гитхаб, и локалку для тестов
+    methods: ["GET", "POST"],
+    credentials: true
+}));
+
 app.use(express.json());
 
 // Подключение БД и Роутов
@@ -17,10 +22,15 @@ app.use('/api/auth', require('./auth'));
 
 const server = http.createServer(app);
 
-app.use(cors({
-    origin: "https://ytsyke.github.io"
-}));
+// 2. ИНИЦИАЛИЗАЦИЯ SOCKET.IO (Этого не хватало)
+const io = new Server(server, {
+    cors: {
+        origin: "https://ytsyke.github.io",
+        methods: ["GET", "POST"]
+    }
+});
 
+// Теперь переменная io определена и код ниже сработает
 io.on('connection', (socket) => {
     console.log(`Пользователь подключен: ${socket.id}`);
 
@@ -62,8 +72,8 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 3001; // Берем порт из переменной окружения Render
+const PORT = process.env.PORT || 3001;
 
-server.listen(PORT, '0.0.0.0', () => { // Добавляем '0.0.0.0' для корректной работы хостинга
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`Сервер запущен на порту ${PORT}`);
 });
