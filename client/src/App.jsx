@@ -1,48 +1,46 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Editor from './components/Editor';
 import Login from './components/Login';
-import Home from './components/Home';
+import Home from './components/Home'; // Нужно будет создать этот компонент
 import './App.css';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 function App() {
-  // Используем useState, чтобы компонент перерисовывался при входе
-  const [token, setToken] = useState(localStorage.getItem('token'));
-
-  // Функция для входа, которую мы прокинем в компонент Login
-  const handleLogin = (newToken) => {
-    localStorage.setItem('token', newToken);
-    setToken(newToken);
-  };
-
-  const isAuthenticated = !!token;
-
+  // Проверка авторизации
+  const isAuthenticated = !!localStorage.getItem('token');
+//basename="/XXXWord"
   return (
-    <Router basename="/XXXWord">
+    <Router>
       <div className="App">
-        {/* Шапка показывается сразу, как только стейт обновился */}
+        {/* Показываем синюю шапку Word только если юзер вошел */}
         {isAuthenticated && (
           <div className="word-top-bar">
             <div className="word-logo"></div>
+            {/* Сюда можно будет прокинуть стейт с названием файла */}
             <span className="document-name">Документ Word</span>
           </div>
         )}
         
         <Routes>
-          {/* Передаем функцию handleLogin в компонент Login */}
-          <Route path="/login" element={<Login onLogin={handleLogin} />} />
+          {/* Страница логина */}
+          <Route path="/login" element={<Login />} />
 
+          {/* Главная страница со списком документов и кнопкой "Создать" */}
           <Route 
             path="/" 
             element={isAuthenticated ? <Home /> : <Navigate to="/login" />} 
           />
 
+          {/* Страница редактора с динамическим ID документа */}
           <Route 
             path="/document/:docId" 
             element={isAuthenticated ? <Editor /> : <Navigate to="/login" />} 
           />
 
+          {/* Редирект со старого пути /editor на главную или в конкретный док */}
           <Route path="/editor" element={<Navigate to="/" />} />
+          
+          {/* Обработка несуществующих страниц */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </div>
