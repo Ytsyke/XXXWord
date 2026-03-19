@@ -9,7 +9,7 @@ function App() {
   const isAuthenticated = !!localStorage.getItem('token');
 
   return (
-    <Router>
+    <Router basename="/XXXWord">
       <div className="App">
         {/* Показываем синюю шапку Word только если юзер вошел */}
         {isAuthenticated && (
