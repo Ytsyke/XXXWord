@@ -3,7 +3,8 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import './Login.css';
 
-const Login = () => {
+// Принимаем onLogin как пропс
+const Login = ({ onLogin }) => {
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -13,13 +14,16 @@ const Login = () => {
     e.preventDefault();
     const endpoint = isRegister ? 'register' : 'login';
     try {
-     const { data } = await axios.post(`https://xxxword.onrender.com/api/auth/${endpoint}`, {
+      const { data } = await axios.post(`https://xxxword.onrender.com/api/auth/${endpoint}`, {
         username, password
       });
+
       if (!isRegister) {
-        localStorage.setItem('token', data.token); // Сохраняем "ключ" входа
-        navigate('/editor');
-        window.location.reload(); // Чтобы App.jsx увидел токен
+        // ВЫЗЫВАЕМ ФУНКЦИЮ ИЗ App.jsx
+        onLogin(data.token); 
+        
+        // Переходим на главную. Больше никакой перезагрузки!
+        navigate('/'); 
       } else {
         alert('Успешно! Теперь войдите.');
         setIsRegister(false);
@@ -38,7 +42,7 @@ const Login = () => {
           <input type="password" placeholder="Пароль" onChange={(e) => setPassword(e.target.value)} required />
           <button type="submit">{isRegister ? 'Создать аккаунт' : 'Войти'}</button>
         </form>
-        <p onClick={() => setIsRegister(!isRegister)}>
+        <p onClick={() => setIsRegister(!isRegister)} style={{cursor: 'pointer'}}>
           {isRegister ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться'}
         </p>
       </div>
