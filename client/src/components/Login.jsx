@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios'; // Не забудь установить: npm install axios
+import axios from 'axios'; 
 import { useNavigate } from 'react-router-dom';
 import './Login.css';
 
@@ -13,7 +13,7 @@ const Login = () => {
     e.preventDefault();
     const endpoint = isRegister ? 'register' : 'login';
     try {
-      const { data } = await axios.post(`http://localhost:3001/api/auth/${endpoint}`, {
+     const { data } = await axios.post(`https://xxxword.onrender.com/api/auth/${endpoint}`, {
         username, password
       });
       if (!isRegister) {

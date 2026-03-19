@@ -17,12 +17,9 @@ app.use('/api/auth', require('./auth'));
 
 const server = http.createServer(app);
 
-const io = new Server(server, {
-    cors: {
-        origin: "http://localhost:5173",
-        methods: ["GET", "POST"]
-    }
-});
+app.use(cors({
+    origin: "https://ytsyke.github.io"
+}));
 
 io.on('connection', (socket) => {
     console.log(`Пользователь подключен: ${socket.id}`);
@@ -65,7 +62,8 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = 3001;
-server.listen(PORT, () => {
-    console.log(`Сервер запущен на http://localhost:${PORT}`);
+const PORT = process.env.PORT || 3001; // Берем порт из переменной окружения Render
+
+server.listen(PORT, '0.0.0.0', () => { // Добавляем '0.0.0.0' для корректной работы хостинга
+    console.log(`Сервер запущен на порту ${PORT}`);
 });
