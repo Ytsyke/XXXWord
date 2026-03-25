@@ -13,12 +13,27 @@ const Editor = () => {
   const socket = useSocket();
   const { docId } = useParams();
   const isRemoteUpdate = useRef(false);
-
+  const FontSize = TextStyle.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      fontSize: {
+        default: null,
+        parseHTML: element => element.style.fontSize,
+        renderHTML: attributes => {
+          if (!attributes.fontSize) return {}
+          return { style: `font-size: ${attributes.fontSize}` }
+        },
+      },
+    }
+  },
+})
   const editor = useEditor({
     extensions: [
       StarterKit,
       Underline,
       TextStyle,
+      FontSize,
       FontFamily,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
     ],

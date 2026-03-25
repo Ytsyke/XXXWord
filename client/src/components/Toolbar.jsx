@@ -38,13 +38,16 @@ const Toolbar = ({ editor }) => {
 
           {/* Выбор размера */}
           <select 
-            onChange={e => editor.chain().focus().setMark('textStyle', { fontSize: e.target.value }).run()}
-            className="size-select"
-          >   
-            {sizes.map(size => (
-              <option key={size} value={size}>{size.replace('px', '')}</option>
-            ))}
-          </select>
+  className="size-select"
+  onChange={e => {
+    const size = e.target.value;
+    editor.chain().focus().setMark('textStyle', { fontSize: size }).run();
+  }}
+>   
+  {sizes.map(size => (
+    <option key={size} value={size}>{size.replace('px', '')}</option>
+  ))}
+</select>
         </div>
   
         <div className="tool-row">
