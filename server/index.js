@@ -6,74 +6,47 @@ const connectDB = require('./db');
 const Document = require('./models/Document');
 
 const app = express();
-
-// 1. Настройки CORS (лучше объединить в одном месте)
 app.use(cors({
-    origin: ["https://ytsyke.github.io", "http://localhost:3000"], // Разрешаем и гитхаб, и локалку для тестов
-    methods: ["GET", "POST"],
+    origin: ["https://ytsyke.github.io", "http://localhost:3000"],
     credentials: true
 }));
-
 app.use(express.json());
 
-// Подключение БД и Роутов
 connectDB();
 app.use('/api/auth', require('./auth'));
 
-const server = http.createServer(app);
-
-// 2. ИНИЦИАЛИЗАЦИЯ SOCKET.IO (Этого не хватало)
-const io = new Server(server, {
-    cors: {
-        origin: "https://ytsyke.github.io",
-        methods: ["GET", "POST"]
-    }
+// Эндпоинт для получения всех документов
+app.get('/api/auth/documents', async (req, res) => {
+    const docs = await Document.find({}, '_id');
+    res.json(docs);
 });
 
-// Теперь переменная io определена и код ниже сработает
-io.on('connection', (socket) => {
-    console.log(`Пользователь подключен: ${socket.id}`);
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: { origin: "https://ytsyke.github.io", methods: ["GET", "POST"] }
+});
 
-    // 1. Вход в конкретный документ (комнату)
+io.on('connection', (socket) => {
     socket.on('join-document', async (docId) => {
         socket.join(docId);
-        console.log(`Юзер ${socket.id} вошел в документ: ${docId}`);
-
         try {
             let document = await Document.findById(docId);
-            
-            // Если документа нет в базе — создаем его
             if (!document) {
-                document = await Document.create({ _id: docId, content: "" });
+                document = await Document.create({ _id: docId, data: "" });
             }
-
-            // Отправляем содержимое клиенту
-            socket.emit('load-document', document.content);
-        } catch (err) {
-            console.error("Ошибка при загрузке документа:", err);
-        }
+            socket.emit('load-document', document.data);
+        } catch (err) { console.error(err); }
     });
 
-    // 2. Обработка изменений в реальном времени
-    socket.on('edit-content', async ({ docId, content }) => {
-        // Отправляем изменения всем в комнате, КРОМЕ отправителя
-        socket.to(docId).emit('update-content', content);
-        
-        // Сохраняем в БД
+    socket.on('edit-content', async ({ docId, html }) => {
+        socket.to(docId).emit('update-content', html);
         try {
-            await Document.findByIdAndUpdate(docId, { content });
-        } catch (err) {
-            console.error("Ошибка при сохранении:", err);
-        }
+            await Document.findByIdAndUpdate(docId, { data: html });
+        } catch (err) { console.error(err); }
     });
 
-    socket.on('disconnect', () => {
-        console.log('Пользователь отключился');
-    });
+    socket.on('disconnect', () => console.log('Disconnected'));
 });
 
 const PORT = process.env.PORT || 3001;
-
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Сервер запущен на порту ${PORT}`);
-});
+server.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
