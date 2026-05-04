@@ -3,6 +3,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Eraser, RotateCcw, RotateCw, Download
 } from 'lucide-react'
+import { Document as DocxDocument, Packer, Paragraph } from 'docx'
 
 const fonts = [
   'Inter', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana'
@@ -14,10 +15,7 @@ const Toolbar = ({ editor, docId }) => {
 
   const iconSize = 14;
 
-  const exportHtml = () => {
-    const html = editor.getHTML();
-    const fileName = `document-${docId || 'export'}.html`;
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const downloadBlob = (blob, fileName) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -26,6 +24,29 @@ const Toolbar = ({ editor, docId }) => {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  };
+
+  const exportTxt = () => {
+    const text = editor.getText();
+    const fileName = `document-${docId || 'export'}.txt`;
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    downloadBlob(blob, fileName);
+  };
+
+  const exportDocx = async () => {
+    const text = editor.getText();
+    const fileName = `document-${docId || 'export'}.docx`;
+
+    const paragraphs = text
+      .split(/\r?\n/)
+      .map((line) => new Paragraph({ text: line || ' ' }));
+
+    const doc = new DocxDocument({
+      sections: [{ properties: {}, children: paragraphs }]
+    });
+
+    const blob = await Packer.toBlob(doc);
+    downloadBlob(blob, fileName);
   };
 
   return (
@@ -90,9 +111,14 @@ const Toolbar = ({ editor, docId }) => {
 
       <div className="toolbar-spacer" />
 
-      <button className="toolbar-export-btn" onClick={exportHtml} title="Скачать HTML">
+      <button className="toolbar-export-btn" onClick={exportTxt} title="Скачать TXT">
         <Download size={iconSize} />
-        Экспорт
+        TXT
+      </button>
+
+      <button className="toolbar-export-btn" onClick={exportDocx} title="Скачать DOCX">
+        <Download size={iconSize} />
+        DOCX
       </button>
     </div>
   )
