@@ -200,10 +200,10 @@ const Editor = ({ token }) => {
 
   return (
     <div className="editor-wrapper">
-      <div style={{ background: '#f3f2f1', padding: '8px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', boxSizing: 'border-box' }}>
+      <div className="editor-topbar">
           <button
             onClick={() => navigate('/')}
-            style={{ padding: '6px 12px', cursor: 'pointer', background: '#ffffff', color: '#2b579a', border: '1px solid #d1d1d1', borderRadius: '4px' }}
+            className="editor-btn editor-btn-secondary"
           >
             Назад к документам
           </button>
@@ -220,22 +220,19 @@ const Editor = ({ token }) => {
                 alert("Не удалось создать ссылку доступа");
               }
             }} 
-            style={{padding: '5px 15px', cursor: 'pointer', background: '#2b579a', color: 'white', border: 'none', borderRadius: '4px'}}
+            className="editor-btn editor-btn-primary"
           >
             Поделиться доступом
           </button>
       </div>
       <Toolbar editor={editor} />
-      <div style={{ width: '100%', maxWidth: '210mm', marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+      <div className="participants-bar">
         {participants.map((user) => (
-          <div key={user.socketId} style={{
-            border: `1px solid ${user.color}`,
-            color: user.color,
-            borderRadius: '999px',
-            padding: '2px 8px',
-            fontSize: '12px',
-            background: '#fff'
-          }}>
+          <div
+            key={user.socketId}
+            className="participant-pill"
+            style={{ borderColor: user.color, color: user.color }}
+          >
             {user.username}
           </div>
         ))}
