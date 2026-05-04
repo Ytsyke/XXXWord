@@ -52,8 +52,8 @@ function App() {
         
         <Routes>
           <Route path="/login" element={!isAuthenticated ? <Login onLogin={handleLogin} /> : <Navigate to="/" />} />
-          <Route path="/" element={isAuthenticated ? <Home /> : <Navigate to="/login" />} />
-          <Route path="/document/:docId" element={isAuthenticated ? <Editor /> : <Navigate to="/login" />} />
+          <Route path="/" element={isAuthenticated ? <Home token={token} /> : <Navigate to="/login" />} />
+          <Route path="/document/:docId" element={isAuthenticated ? <Editor token={token} /> : <Navigate to="/login" />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </div>

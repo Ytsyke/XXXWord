@@ -3,16 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { nanoid } from 'nanoid';
 import axios from 'axios';
 
-const Home = () => {
+const Home = ({ token }) => {
   const navigate = useNavigate();
   const [docs, setDocs] = useState([]);
 
   useEffect(() => {
-    // Подгружаем список документов (опционально, если хочешь видеть историю)
-    axios.get('https://xxxword.onrender.com/api/auth/documents') // Добавим этот роут на бэк
+    axios.get('https://xxxword.onrender.com/api/auth/documents', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
       .then(res => setDocs(res.data))
       .catch(err => console.error("Ошибка загрузки списка:", err));
-  }, []);
+  }, [token]);
 
   const createNewDocument = () => {
     const id = nanoid(10);
@@ -40,6 +41,7 @@ const Home = () => {
           }}>
             <div style={{fontSize: '40px'}}>📄</div>
             <p style={{fontSize: '12px', overflow: 'hidden', padding: '0 10px'}}>{doc._id}</p>
+            <p style={{ fontSize: '11px', color: '#2b579a' }}>{doc.isOwner ? 'Ваш документ' : 'Вам открыт доступ'}</p>
           </div>
         ))}
       </div>

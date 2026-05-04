@@ -1,8 +1,14 @@
 import { io } from 'socket.io-client';
+import { useEffect, useMemo } from 'react';
 
-// Подключаемся к нашему серверу (порт 3001, который мы указали в server/index.js)
-const socket = io('https://xxxword.onrender.com');
+export const useSocket = (token) => {
+  const socket = useMemo(() => io('https://xxxword.onrender.com', {
+    auth: { token }
+  }), [token]);
 
-export const useSocket = () => {
+  useEffect(() => {
+    return () => socket.disconnect();
+  }, [socket]);
+
   return socket;
 };
