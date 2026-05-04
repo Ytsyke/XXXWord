@@ -17,6 +17,10 @@ const Editor = ({ token }) => {
   const location = useLocation();
   const inviteToken = new URLSearchParams(location.search).get('invite');
   const isRemoteUpdate = useRef(false);
+  const isLocallyTyping = useRef(false);
+  const pendingRemoteHtml = useRef(null);
+  const typingStopTimer = useRef(null);
+  const emitTimer = useRef(null);
   const FontSize = TextStyle.extend({
   addAttributes() {
     return {
@@ -43,8 +47,24 @@ const Editor = ({ token }) => {
     ],
     onUpdate: ({ editor }) => {
       if (isRemoteUpdate.current) return;
+
+      isLocallyTyping.current = true;
+      if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
+      typingStopTimer.current = setTimeout(() => {
+        isLocallyTyping.current = false;
+        if (pendingRemoteHtml.current && pendingRemoteHtml.current !== editor.getHTML()) {
+          isRemoteUpdate.current = true;
+          editor.commands.setContent(pendingRemoteHtml.current, false);
+          isRemoteUpdate.current = false;
+        }
+        pendingRemoteHtml.current = null;
+      }, 300);
+
       const html = editor.getHTML();
-      socket.emit('edit-content', { docId, html });
+      if (emitTimer.current) clearTimeout(emitTimer.current);
+      emitTimer.current = setTimeout(() => {
+        socket.emit('edit-content', { docId, html });
+      }, 80);
     },
   });
 
@@ -68,15 +88,16 @@ const Editor = ({ token }) => {
     });
 
     socket.on('update-content', (html) => {
-      if (html !== editor.getHTML()) {
-        isRemoteUpdate.current = true;
-        const { from, to } = editor.state.selection;
-        editor.commands.setContent(html, false);
-        try { editor.commands.setTextSelection({ from, to }); } catch {
-          // Игнорируем случай, когда старая позиция курсора уже недоступна.
-        }
-        isRemoteUpdate.current = false;
+      if (html === editor.getHTML()) return;
+
+      if (isLocallyTyping.current) {
+        pendingRemoteHtml.current = html;
+        return;
       }
+
+      isRemoteUpdate.current = true;
+      editor.commands.setContent(html, false);
+      isRemoteUpdate.current = false;
     });
 
     socket.on('access-denied', () => {
@@ -85,6 +106,8 @@ const Editor = ({ token }) => {
     });
 
     return () => {
+      if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
+      if (emitTimer.current) clearTimeout(emitTimer.current);
       socket.off('load-document');
       socket.off('update-content');
       socket.off('access-denied');
