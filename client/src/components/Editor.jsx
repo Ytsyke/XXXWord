@@ -17,37 +17,11 @@ const Editor = ({ token }) => {
   const location = useLocation();
   const inviteToken = new URLSearchParams(location.search).get('invite');
   const isRemoteUpdate = useRef(false);
-  const isLocallyTyping = useRef(false);
-  const pendingRemoteHtml = useRef(null);
-  const typingStopTimer = useRef(null);
-  const idleApplyTimer = useRef(null);
+  const currentVersion = useRef(0);
   const emitTimer = useRef(null);
   const editorContainerRef = useRef(null);
   const [participants, setParticipants] = useState([]);
   const [remoteCursors, setRemoteCursors] = useState({});
-
-  const applyPendingRemoteSafely = (currentEditor) => {
-    const nextHtml = pendingRemoteHtml.current;
-    if (!nextHtml || nextHtml === currentEditor.getHTML()) {
-      pendingRemoteHtml.current = null;
-      return;
-    }
-
-    const { from, to } = currentEditor.state.selection;
-    isRemoteUpdate.current = true;
-    currentEditor.commands.setContent(nextHtml, false);
-    try {
-      const maxPos = Math.max(1, currentEditor.state.doc.content.size);
-      currentEditor.commands.setTextSelection({
-        from: Math.min(from, maxPos),
-        to: Math.min(to, maxPos)
-      });
-    } catch {
-      // Если позиция курсора устарела после remote-апдейта, просто оставляем стандартную.
-    }
-    isRemoteUpdate.current = false;
-    pendingRemoteHtml.current = null;
-  };
   const FontSize = TextStyle.extend({
   addAttributes() {
     return {
@@ -74,25 +48,11 @@ const Editor = ({ token }) => {
     ],
     onUpdate: ({ editor }) => {
       if (isRemoteUpdate.current) return;
-
-      isLocallyTyping.current = true;
-      if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
-      typingStopTimer.current = setTimeout(() => {
-        isLocallyTyping.current = false;
-      }, 900);
-
-      if (idleApplyTimer.current) clearTimeout(idleApplyTimer.current);
-      idleApplyTimer.current = setTimeout(() => {
-        if (!isLocallyTyping.current) {
-          applyPendingRemoteSafely(editor);
-        }
-      }, 1100);
-
       const html = editor.getHTML();
       if (emitTimer.current) clearTimeout(emitTimer.current);
       emitTimer.current = setTimeout(() => {
-        socket.emit('edit-content', { docId, html });
-      }, 80);
+        socket.emit('edit-content', { docId, html, version: currentVersion.current });
+      }, 60);
     },
   });
 
@@ -109,24 +69,40 @@ const Editor = ({ token }) => {
 
     socket.emit('join-document', { docId, inviteToken });
 
-    socket.on('load-document', (html) => {
+    socket.on('load-document', (payload) => {
+      const html = typeof payload === 'string' ? payload : payload?.html;
+      const version = typeof payload === 'object' && payload !== null ? payload.version : 0;
+      currentVersion.current = Number(version || 0);
       isRemoteUpdate.current = true;
       editor.commands.setContent(html || '', false);
       isRemoteUpdate.current = false;
     });
 
-    socket.on('update-content', (html) => {
+    socket.on('update-content', ({ html, version }) => {
+      const incomingVersion = Number(version || 0);
+      if (incomingVersion <= currentVersion.current) return;
+      currentVersion.current = incomingVersion;
       if (html === editor.getHTML()) return;
-
-      // Не перетираем документ во время активного ввода/фокуса, иначе курсор "прыгает".
-      if (isLocallyTyping.current || editor.isFocused) {
-        pendingRemoteHtml.current = html;
-        return;
-      }
-
       isRemoteUpdate.current = true;
+      const { from, to } = editor.state.selection;
       editor.commands.setContent(html, false);
+      try {
+        const maxPos = Math.max(1, editor.state.doc.content.size);
+        editor.commands.setTextSelection({
+          from: Math.min(from, maxPos),
+          to: Math.min(to, maxPos)
+        });
+      } catch {
+        // Если позиция каретки изменилась после remote-обновления, оставляем дефолтную.
+      }
       isRemoteUpdate.current = false;
+    });
+
+    socket.on('document-version', (version) => {
+      const incomingVersion = Number(version || 0);
+      if (incomingVersion > currentVersion.current) {
+        currentVersion.current = incomingVersion;
+      }
     });
 
     socket.on('participants-update', (users) => {
@@ -154,10 +130,10 @@ const Editor = ({ token }) => {
     });
 
     return () => {
-      if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
       if (emitTimer.current) clearTimeout(emitTimer.current);
       socket.off('load-document');
       socket.off('update-content');
+      socket.off('document-version');
       socket.off('participants-update');
       socket.off('cursor-update');
       socket.off('access-denied');
@@ -172,20 +148,13 @@ const Editor = ({ token }) => {
       socket.emit('cursor-update', { docId, from, to });
     };
 
-    const applyPendingRemote = () => {
-      applyPendingRemoteSafely(editor);
-    };
-
     sendCursor();
     editor.on('selectionUpdate', sendCursor);
     editor.on('focus', sendCursor);
-    editor.on('blur', applyPendingRemote);
 
     return () => {
-      if (idleApplyTimer.current) clearTimeout(idleApplyTimer.current);
       editor.off('selectionUpdate', sendCursor);
       editor.off('focus', sendCursor);
-      editor.off('blur', applyPendingRemote);
     };
   }, [editor, socket, docId]);
 

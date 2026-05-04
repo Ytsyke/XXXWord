@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const DocumentSchema = new mongoose.Schema({
     _id: { type: String, required: true },
     data: { type: String, default: "" }, // Храним чистый HTML
+    version: { type: Number, default: 0 },
     ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     collaborators: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     shareTokens: [{

@@ -172,6 +172,7 @@ io.on('connection', (socket) => {
                 document = await Document.create({
                     _id: docId,
                     data: "",
+                    version: 0,
                     ownerId: userId,
                     collaborators: [],
                     shareTokens: []
@@ -198,20 +199,34 @@ io.on('connection', (socket) => {
             }
             docParticipants.get(docId).set(socket.id, participantMeta);
 
-            socket.emit('load-document', document.data);
+            socket.emit('load-document', {
+                html: document.data,
+                version: document.version || 0
+            });
             broadcastParticipants(io, docId);
         } catch (err) { console.error(err); }
     });
 
     socket.on('edit-content', async ({ docId, html }) => {
         if (!userId) return;
-
-        socket.to(docId).emit('update-content', html);
         try {
-            await Document.findOneAndUpdate({
+            const updatedDocument = await Document.findOneAndUpdate({
                 _id: docId,
                 $or: [{ ownerId: userId }, { collaborators: userId }]
-            }, { data: html });
+            }, {
+                $set: { data: html },
+                $inc: { version: 1 }
+            }, {
+                new: true
+            });
+
+            if (!updatedDocument) return;
+
+            socket.to(docId).emit('update-content', {
+                html,
+                version: updatedDocument.version
+            });
+            socket.emit('document-version', updatedDocument.version);
         } catch (err) { console.error(err); }
     });
 
