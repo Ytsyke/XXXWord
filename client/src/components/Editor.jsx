@@ -93,7 +93,8 @@ const Editor = ({ token }) => {
     socket.on('update-content', (html) => {
       if (html === editor.getHTML()) return;
 
-      if (isLocallyTyping.current) {
+      // Не перетираем документ во время активного ввода/фокуса, иначе курсор "прыгает".
+      if (isLocallyTyping.current || editor.isFocused) {
         pendingRemoteHtml.current = html;
         return;
       }
@@ -146,13 +147,27 @@ const Editor = ({ token }) => {
       socket.emit('cursor-update', { docId, from, to });
     };
 
+    const applyPendingRemote = () => {
+      if (!pendingRemoteHtml.current) return;
+      if (pendingRemoteHtml.current === editor.getHTML()) {
+        pendingRemoteHtml.current = null;
+        return;
+      }
+      isRemoteUpdate.current = true;
+      editor.commands.setContent(pendingRemoteHtml.current, false);
+      isRemoteUpdate.current = false;
+      pendingRemoteHtml.current = null;
+    };
+
     sendCursor();
     editor.on('selectionUpdate', sendCursor);
     editor.on('focus', sendCursor);
+    editor.on('blur', applyPendingRemote);
 
     return () => {
       editor.off('selectionUpdate', sendCursor);
       editor.off('focus', sendCursor);
+      editor.off('blur', applyPendingRemote);
     };
   }, [editor, socket, docId]);
 
