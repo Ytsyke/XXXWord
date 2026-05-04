@@ -20,10 +20,34 @@ const Editor = ({ token }) => {
   const isLocallyTyping = useRef(false);
   const pendingRemoteHtml = useRef(null);
   const typingStopTimer = useRef(null);
+  const idleApplyTimer = useRef(null);
   const emitTimer = useRef(null);
   const editorContainerRef = useRef(null);
   const [participants, setParticipants] = useState([]);
   const [remoteCursors, setRemoteCursors] = useState({});
+
+  const applyPendingRemoteSafely = (currentEditor) => {
+    const nextHtml = pendingRemoteHtml.current;
+    if (!nextHtml || nextHtml === currentEditor.getHTML()) {
+      pendingRemoteHtml.current = null;
+      return;
+    }
+
+    const { from, to } = currentEditor.state.selection;
+    isRemoteUpdate.current = true;
+    currentEditor.commands.setContent(nextHtml, false);
+    try {
+      const maxPos = Math.max(1, currentEditor.state.doc.content.size);
+      currentEditor.commands.setTextSelection({
+        from: Math.min(from, maxPos),
+        to: Math.min(to, maxPos)
+      });
+    } catch {
+      // Если позиция курсора устарела после remote-апдейта, просто оставляем стандартную.
+    }
+    isRemoteUpdate.current = false;
+    pendingRemoteHtml.current = null;
+  };
   const FontSize = TextStyle.extend({
   addAttributes() {
     return {
@@ -55,7 +79,14 @@ const Editor = ({ token }) => {
       if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
       typingStopTimer.current = setTimeout(() => {
         isLocallyTyping.current = false;
-      }, 700);
+      }, 900);
+
+      if (idleApplyTimer.current) clearTimeout(idleApplyTimer.current);
+      idleApplyTimer.current = setTimeout(() => {
+        if (!isLocallyTyping.current) {
+          applyPendingRemoteSafely(editor);
+        }
+      }, 1100);
 
       const html = editor.getHTML();
       if (emitTimer.current) clearTimeout(emitTimer.current);
@@ -142,15 +173,7 @@ const Editor = ({ token }) => {
     };
 
     const applyPendingRemote = () => {
-      if (!pendingRemoteHtml.current) return;
-      if (pendingRemoteHtml.current === editor.getHTML()) {
-        pendingRemoteHtml.current = null;
-        return;
-      }
-      isRemoteUpdate.current = true;
-      editor.commands.setContent(pendingRemoteHtml.current, false);
-      isRemoteUpdate.current = false;
-      pendingRemoteHtml.current = null;
+      applyPendingRemoteSafely(editor);
     };
 
     sendCursor();
@@ -159,6 +182,7 @@ const Editor = ({ token }) => {
     editor.on('blur', applyPendingRemote);
 
     return () => {
+      if (idleApplyTimer.current) clearTimeout(idleApplyTimer.current);
       editor.off('selectionUpdate', sendCursor);
       editor.off('focus', sendCursor);
       editor.off('blur', applyPendingRemote);
