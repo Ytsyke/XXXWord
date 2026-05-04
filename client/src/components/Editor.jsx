@@ -225,7 +225,7 @@ const Editor = ({ token }) => {
             Поделиться доступом
           </button>
       </div>
-      <Toolbar editor={editor} />
+      <Toolbar editor={editor} docId={docId} />
       <div className="participants-bar">
         {participants.map((user) => (
           <div
