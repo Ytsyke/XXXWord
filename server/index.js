@@ -108,9 +108,7 @@ const io = new Server(server, {
     cors: { origin: "https://ytsyke.github.io", methods: ["GET", "POST"] }
 });
 
-const docEditLocks = new Map();
 const docParticipants = new Map();
-const LOCK_TTL_MS = 1200;
 const CURSOR_COLORS = ['#2b579a', '#d83b01', '#107c10', '#5c2d91', '#008272', '#c239b3'];
 
 function colorByUserId(userId = '') {
@@ -120,13 +118,6 @@ function colorByUserId(userId = '') {
         hash |= 0;
     }
     return CURSOR_COLORS[Math.abs(hash) % CURSOR_COLORS.length];
-}
-
-function broadcastLock(ioServer, docId) {
-    const lock = docEditLocks.get(docId);
-    ioServer.to(docId).emit('edit-lock', {
-        holderSocketId: lock ? lock.socketId : null
-    });
 }
 
 function broadcastParticipants(ioServer, docId) {
@@ -148,33 +139,6 @@ function removeParticipant(ioServer, docId, socketId) {
         docParticipants.delete(docId);
     }
     broadcastParticipants(ioServer, docId);
-}
-
-function releaseLock(ioServer, docId, socketId = null) {
-    const current = docEditLocks.get(docId);
-    if (!current) return;
-    if (socketId && current.socketId !== socketId) return;
-    clearTimeout(current.timer);
-    docEditLocks.delete(docId);
-    broadcastLock(ioServer, docId);
-}
-
-function acquireOrRefreshLock(ioServer, docId, socketId) {
-    const current = docEditLocks.get(docId);
-    if (current && current.socketId !== socketId) return false;
-    if (current?.timer) clearTimeout(current.timer);
-
-    const timer = setTimeout(() => {
-        const lock = docEditLocks.get(docId);
-        if (lock && lock.socketId === socketId) {
-            docEditLocks.delete(docId);
-            broadcastLock(ioServer, docId);
-        }
-    }, LOCK_TTL_MS);
-
-    docEditLocks.set(docId, { socketId, timer });
-    broadcastLock(ioServer, docId);
-    return true;
 }
 
 io.on('connection', (socket) => {
@@ -201,7 +165,6 @@ io.on('connection', (socket) => {
             if (previousDocId && previousDocId !== docId) {
                 socket.leave(previousDocId);
                 removeParticipant(io, previousDocId, socket.id);
-                releaseLock(io, previousDocId, socket.id);
             }
 
             let document = await Document.findById(docId);
@@ -237,17 +200,11 @@ io.on('connection', (socket) => {
 
             socket.emit('load-document', document.data);
             broadcastParticipants(io, docId);
-            broadcastLock(io, docId);
         } catch (err) { console.error(err); }
     });
 
     socket.on('edit-content', async ({ docId, html }) => {
         if (!userId) return;
-        const lockAcquired = acquireOrRefreshLock(io, docId, socket.id);
-        if (!lockAcquired) {
-            socket.emit('edit-rejected', 'Сейчас редактирует другой пользователь');
-            return;
-        }
 
         socket.to(docId).emit('update-content', html);
         try {
@@ -277,7 +234,6 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         if (socket.data.docId) {
             removeParticipant(io, socket.data.docId, socket.id);
-            releaseLock(io, socket.data.docId, socket.id);
         }
         console.log('Disconnected');
     });

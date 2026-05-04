@@ -22,7 +22,6 @@ const Editor = ({ token }) => {
   const typingStopTimer = useRef(null);
   const emitTimer = useRef(null);
   const editorContainerRef = useRef(null);
-  const [isTemporarilyReadOnly, setIsTemporarilyReadOnly] = useState(false);
   const [participants, setParticipants] = useState([]);
   const [remoteCursors, setRemoteCursors] = useState({});
   const FontSize = TextStyle.extend({
@@ -128,17 +127,6 @@ const Editor = ({ token }) => {
       navigate('/');
     });
 
-    socket.on('edit-lock', ({ holderSocketId }) => {
-      const lockedByAnother = Boolean(holderSocketId && holderSocketId !== socket.id);
-      setIsTemporarilyReadOnly(lockedByAnother);
-      editor.setEditable(!lockedByAnother);
-    });
-
-    socket.on('edit-rejected', () => {
-      setIsTemporarilyReadOnly(true);
-      editor.setEditable(false);
-    });
-
     return () => {
       if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
       if (emitTimer.current) clearTimeout(emitTimer.current);
@@ -147,8 +135,6 @@ const Editor = ({ token }) => {
       socket.off('participants-update');
       socket.off('cursor-update');
       socket.off('access-denied');
-      socket.off('edit-lock');
-      socket.off('edit-rejected');
     };
   }, [editor, socket, docId, token, navigate, inviteToken]);
 
@@ -239,21 +225,6 @@ const Editor = ({ token }) => {
           </button>
       </div>
       <Toolbar editor={editor} />
-      {isTemporarilyReadOnly && (
-        <div style={{
-          width: '100%',
-          maxWidth: '210mm',
-          background: '#fff4ce',
-          color: '#5c2e00',
-          border: '1px solid #f1d58a',
-          borderRadius: '6px',
-          padding: '8px 12px',
-          marginTop: '10px',
-          boxSizing: 'border-box'
-        }}>
-          Другой пользователь печатает прямо сейчас. Через секунду редактор снова станет доступен.
-        </div>
-      )}
       <div style={{ width: '100%', maxWidth: '210mm', marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         {participants.map((user) => (
           <div key={user.socketId} style={{
