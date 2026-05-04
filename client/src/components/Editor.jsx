@@ -1,6 +1,6 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSocket } from '../hooks/useSocket'
 import Toolbar from './Toolbar'
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -21,6 +21,10 @@ const Editor = ({ token }) => {
   const pendingRemoteHtml = useRef(null);
   const typingStopTimer = useRef(null);
   const emitTimer = useRef(null);
+  const editorContainerRef = useRef(null);
+  const [isTemporarilyReadOnly, setIsTemporarilyReadOnly] = useState(false);
+  const [participants, setParticipants] = useState([]);
+  const [remoteCursors, setRemoteCursors] = useState({});
   const FontSize = TextStyle.extend({
   addAttributes() {
     return {
@@ -100,9 +104,39 @@ const Editor = ({ token }) => {
       isRemoteUpdate.current = false;
     });
 
+    socket.on('participants-update', (users) => {
+      setParticipants(users);
+      setRemoteCursors((prev) => {
+        const allowedSocketIds = new Set(users.map((user) => user.socketId));
+        const next = {};
+        Object.entries(prev).forEach(([socketId, value]) => {
+          if (allowedSocketIds.has(socketId)) next[socketId] = value;
+        });
+        return next;
+      });
+    });
+
+    socket.on('cursor-update', (cursorData) => {
+      setRemoteCursors((prev) => ({
+        ...prev,
+        [cursorData.socketId]: cursorData
+      }));
+    });
+
     socket.on('access-denied', () => {
       alert('У вас нет доступа к этому документу');
       navigate('/');
+    });
+
+    socket.on('edit-lock', ({ holderSocketId }) => {
+      const lockedByAnother = Boolean(holderSocketId && holderSocketId !== socket.id);
+      setIsTemporarilyReadOnly(lockedByAnother);
+      editor.setEditable(!lockedByAnother);
+    });
+
+    socket.on('edit-rejected', () => {
+      setIsTemporarilyReadOnly(true);
+      editor.setEditable(false);
     });
 
     return () => {
@@ -110,11 +144,72 @@ const Editor = ({ token }) => {
       if (emitTimer.current) clearTimeout(emitTimer.current);
       socket.off('load-document');
       socket.off('update-content');
+      socket.off('participants-update');
+      socket.off('cursor-update');
       socket.off('access-denied');
+      socket.off('edit-lock');
+      socket.off('edit-rejected');
     };
   }, [editor, socket, docId, token, navigate, inviteToken]);
 
+  useEffect(() => {
+    if (!editor || !socket) return;
+
+    const sendCursor = () => {
+      const { from, to } = editor.state.selection;
+      socket.emit('cursor-update', { docId, from, to });
+    };
+
+    sendCursor();
+    editor.on('selectionUpdate', sendCursor);
+    editor.on('focus', sendCursor);
+
+    return () => {
+      editor.off('selectionUpdate', sendCursor);
+      editor.off('focus', sendCursor);
+    };
+  }, [editor, socket, docId]);
+
   if (!editor) return null;
+
+  const remoteCursorMarkers = Object.values(remoteCursors).map((cursor) => {
+    if (!editorContainerRef.current || !editor.view) return null;
+
+    try {
+      const containerRect = editorContainerRef.current.getBoundingClientRect();
+      const coords = editor.view.coordsAtPos(cursor.from);
+      const top = coords.top - containerRect.top + editorContainerRef.current.scrollTop;
+      const left = coords.left - containerRect.left + editorContainerRef.current.scrollLeft;
+
+      return (
+        <div
+          key={cursor.socketId}
+          style={{
+            position: 'absolute',
+            top: `${top}px`,
+            left: `${left}px`,
+            pointerEvents: 'none',
+            zIndex: 10
+          }}
+        >
+          <div style={{ width: '2px', height: '20px', background: cursor.color }} />
+          <div style={{
+            marginTop: '2px',
+            fontSize: '10px',
+            color: 'white',
+            background: cursor.color,
+            borderRadius: '3px',
+            padding: '1px 4px',
+            whiteSpace: 'nowrap'
+          }}>
+            {cursor.username}
+          </div>
+        </div>
+      );
+    } catch {
+      return null;
+    }
+  });
 
   return (
     <div className="editor-wrapper">
@@ -144,8 +239,40 @@ const Editor = ({ token }) => {
           </button>
       </div>
       <Toolbar editor={editor} />
-      <div className="editor-container">
+      {isTemporarilyReadOnly && (
+        <div style={{
+          width: '100%',
+          maxWidth: '210mm',
+          background: '#fff4ce',
+          color: '#5c2e00',
+          border: '1px solid #f1d58a',
+          borderRadius: '6px',
+          padding: '8px 12px',
+          marginTop: '10px',
+          boxSizing: 'border-box'
+        }}>
+          Другой пользователь печатает прямо сейчас. Через секунду редактор снова станет доступен.
+        </div>
+      )}
+      <div style={{ width: '100%', maxWidth: '210mm', marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        {participants.map((user) => (
+          <div key={user.socketId} style={{
+            border: `1px solid ${user.color}`,
+            color: user.color,
+            borderRadius: '999px',
+            padding: '2px 8px',
+            fontSize: '12px',
+            background: '#fff'
+          }}>
+            {user.username}
+          </div>
+        ))}
+      </div>
+      <div className="editor-container" ref={editorContainerRef}>
         <EditorContent editor={editor} />
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          {remoteCursorMarkers}
+        </div>
       </div>
     </div>
   )

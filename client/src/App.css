@@ -55,6 +55,7 @@
 
 /* Эффект листа A4 */
 .editor-container {
+  position: relative;
   background: white;
   width: 210mm; /* Стандарт A4 */
   min-height: 297mm;
