@@ -55,13 +55,7 @@ const Editor = ({ token }) => {
       if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
       typingStopTimer.current = setTimeout(() => {
         isLocallyTyping.current = false;
-        if (pendingRemoteHtml.current && pendingRemoteHtml.current !== editor.getHTML()) {
-          isRemoteUpdate.current = true;
-          editor.commands.setContent(pendingRemoteHtml.current, false);
-          isRemoteUpdate.current = false;
-        }
-        pendingRemoteHtml.current = null;
-      }, 300);
+      }, 700);
 
       const html = editor.getHTML();
       if (emitTimer.current) clearTimeout(emitTimer.current);
