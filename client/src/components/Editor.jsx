@@ -8,6 +8,8 @@ import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
 import { TextStyle } from '@tiptap/extension-text-style'
 import { FontFamily } from '@tiptap/extension-font-family'
+import Collaboration from '@tiptap/extension-collaboration'
+import * as Y from 'yjs'
 import axios from 'axios';
 
 const Editor = ({ token }) => {
@@ -16,9 +18,10 @@ const Editor = ({ token }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const inviteToken = new URLSearchParams(location.search).get('invite');
-  const isRemoteUpdate = useRef(false);
-  const currentVersion = useRef(0);
+  const ydocRef = useRef(new Y.Doc());
   const emitTimer = useRef(null);
+  const initialHtmlRef = useRef('');
+  const hasInitializedRef = useRef(false);
   const editorContainerRef = useRef(null);
   const [participants, setParticipants] = useState([]);
   const [remoteCursors, setRemoteCursors] = useState({});
@@ -39,21 +42,16 @@ const Editor = ({ token }) => {
 })
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({ history: false }),
       Underline,
       TextStyle,
       FontSize,
       FontFamily,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      Collaboration.configure({
+        document: ydocRef.current,
+      }),
     ],
-    onUpdate: ({ editor }) => {
-      if (isRemoteUpdate.current) return;
-      const html = editor.getHTML();
-      if (emitTimer.current) clearTimeout(emitTimer.current);
-      emitTimer.current = setTimeout(() => {
-        socket.emit('edit-content', { docId, html, version: currentVersion.current });
-      }, 60);
-    },
   });
 
   useEffect(() => {
@@ -71,38 +69,23 @@ const Editor = ({ token }) => {
 
     socket.on('load-document', (payload) => {
       const html = typeof payload === 'string' ? payload : payload?.html;
-      const version = typeof payload === 'object' && payload !== null ? payload.version : 0;
-      currentVersion.current = Number(version || 0);
-      isRemoteUpdate.current = true;
-      editor.commands.setContent(html || '', false);
-      isRemoteUpdate.current = false;
+      initialHtmlRef.current = html || '';
+
+      if (payload?.yjsState) {
+        Y.applyUpdate(ydocRef.current, new Uint8Array(payload.yjsState), 'remote');
+      }
+
+      if (!hasInitializedRef.current) {
+        const shouldSeedFromHtml = editor.isEmpty && initialHtmlRef.current;
+        if (shouldSeedFromHtml) {
+          editor.commands.setContent(initialHtmlRef.current, false);
+        }
+        hasInitializedRef.current = true;
+      }
     });
 
-    socket.on('update-content', ({ html, version }) => {
-      const incomingVersion = Number(version || 0);
-      if (incomingVersion <= currentVersion.current) return;
-      currentVersion.current = incomingVersion;
-      if (html === editor.getHTML()) return;
-      isRemoteUpdate.current = true;
-      const { from, to } = editor.state.selection;
-      editor.commands.setContent(html, false);
-      try {
-        const maxPos = Math.max(1, editor.state.doc.content.size);
-        editor.commands.setTextSelection({
-          from: Math.min(from, maxPos),
-          to: Math.min(to, maxPos)
-        });
-      } catch {
-        // Если позиция каретки изменилась после remote-обновления, оставляем дефолтную.
-      }
-      isRemoteUpdate.current = false;
-    });
-
-    socket.on('document-version', (version) => {
-      const incomingVersion = Number(version || 0);
-      if (incomingVersion > currentVersion.current) {
-        currentVersion.current = incomingVersion;
-      }
+    socket.on('yjs-update', (update) => {
+      Y.applyUpdate(ydocRef.current, new Uint8Array(update), 'remote');
     });
 
     socket.on('participants-update', (users) => {
@@ -132,8 +115,7 @@ const Editor = ({ token }) => {
     return () => {
       if (emitTimer.current) clearTimeout(emitTimer.current);
       socket.off('load-document');
-      socket.off('update-content');
-      socket.off('document-version');
+      socket.off('yjs-update');
       socket.off('participants-update');
       socket.off('cursor-update');
       socket.off('access-denied');
@@ -142,17 +124,34 @@ const Editor = ({ token }) => {
 
   useEffect(() => {
     if (!editor || !socket) return;
+    const ydoc = ydocRef.current;
+
+    const sendPersistedContent = () => {
+      const html = editor.getHTML();
+      if (emitTimer.current) clearTimeout(emitTimer.current);
+      emitTimer.current = setTimeout(() => {
+        socket.emit('persist-content', { docId, html });
+      }, 500);
+    };
+
+    const onYjsUpdate = (update, origin) => {
+      if (origin === 'remote') return;
+      socket.emit('yjs-update', { docId, update: Array.from(update) });
+      sendPersistedContent();
+    };
 
     const sendCursor = () => {
       const { from, to } = editor.state.selection;
       socket.emit('cursor-update', { docId, from, to });
     };
 
+    ydoc.on('update', onYjsUpdate);
     sendCursor();
     editor.on('selectionUpdate', sendCursor);
     editor.on('focus', sendCursor);
 
     return () => {
+      ydoc.off('update', onYjsUpdate);
       editor.off('selectionUpdate', sendCursor);
       editor.off('focus', sendCursor);
     };

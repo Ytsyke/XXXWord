@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const Y = require('yjs');
 const connectDB = require('./db');
 const Document = require('./models/Document');
 const User = require('./models/User');
@@ -109,6 +110,7 @@ const io = new Server(server, {
 });
 
 const docParticipants = new Map();
+const docYjsStore = new Map();
 const CURSOR_COLORS = ['#2b579a', '#d83b01', '#107c10', '#5c2d91', '#008272', '#c239b3'];
 
 function colorByUserId(userId = '') {
@@ -139,6 +141,13 @@ function removeParticipant(ioServer, docId, socketId) {
         docParticipants.delete(docId);
     }
     broadcastParticipants(ioServer, docId);
+}
+
+function getOrCreateYDoc(docId) {
+    if (!docYjsStore.has(docId)) {
+        docYjsStore.set(docId, new Y.Doc());
+    }
+    return docYjsStore.get(docId);
 }
 
 io.on('connection', (socket) => {
@@ -199,15 +208,27 @@ io.on('connection', (socket) => {
             }
             docParticipants.get(docId).set(socket.id, participantMeta);
 
+            const yDoc = getOrCreateYDoc(docId);
+            const yjsState = Y.encodeStateAsUpdate(yDoc);
+
             socket.emit('load-document', {
                 html: document.data,
-                version: document.version || 0
+                version: document.version || 0,
+                yjsState: Buffer.from(yjsState)
             });
             broadcastParticipants(io, docId);
         } catch (err) { console.error(err); }
     });
 
-    socket.on('edit-content', async ({ docId, html }) => {
+    socket.on('yjs-update', ({ docId, update }) => {
+        if (!userId || socket.data.docId !== docId || !update) return;
+        const yDoc = getOrCreateYDoc(docId);
+        const normalizedUpdate = new Uint8Array(update);
+        Y.applyUpdate(yDoc, normalizedUpdate, 'remote');
+        socket.to(docId).emit('yjs-update', Buffer.from(normalizedUpdate));
+    });
+
+    socket.on('persist-content', async ({ docId, html }) => {
         if (!userId) return;
         try {
             const updatedDocument = await Document.findOneAndUpdate({
@@ -221,12 +242,6 @@ io.on('connection', (socket) => {
             });
 
             if (!updatedDocument) return;
-
-            socket.to(docId).emit('update-content', {
-                html,
-                version: updatedDocument.version
-            });
-            socket.emit('document-version', updatedDocument.version);
         } catch (err) { console.error(err); }
     });
 
