@@ -12,12 +12,14 @@ const sizes = ['8px', '10px', '12px', '14px', '16px', '18px', '20px', '24px', '3
 const Toolbar = ({ editor }) => {
   if (!editor) return null
 
+  const iconSize = 14;
+
   return (
     <div className="word-toolbar">
       {/* Группа: История */}
       <div className="toolbar-section">
-        <button onClick={() => editor.chain().focus().undo().run()} title="Отменить"><RotateCcw size={16}/></button>
-        <button onClick={() => editor.chain().focus().redo().run()} title="Вернуть"><RotateCw size={16}/></button>
+        <button onClick={() => editor.chain().focus().undo().run()} title="Отменить"><RotateCcw size={iconSize}/></button>
+        <button onClick={() => editor.chain().focus().redo().run()} title="Вернуть"><RotateCw size={iconSize}/></button>
       </div>
 
       <div className="v-divider" />
@@ -49,9 +51,6 @@ const Toolbar = ({ editor }) => {
   ))}
 </select>
         </div>
-  
-        <div className="tool-row">
-        </div>
       </div>
 
       <div className="v-divider" />
@@ -59,14 +58,14 @@ const Toolbar = ({ editor }) => {
       {/* Группа: Абзац */}
       <div className="toolbar-section">
         <div className="tool-row">
-          <button onClick={() => editor.chain().focus().setTextAlign('left').run()} className={editor.isActive({ textAlign: 'left' }) ? 'is-active' : ''}><AlignLeft size={16}/></button>
-          <button onClick={() => editor.chain().focus().setTextAlign('center').run()} className={editor.isActive({ textAlign: 'center' }) ? 'is-active' : ''}><AlignCenter size={16}/></button>
-          <button onClick={() => editor.chain().focus().setTextAlign('right').run()} className={editor.isActive({ textAlign: 'right' }) ? 'is-active' : ''}><AlignRight size={16}/></button>
-          <button onClick={() => editor.chain().focus().setTextAlign('justify').run()} className={editor.isActive({ textAlign: 'justify' }) ? 'is-active' : ''}><AlignJustify size={16}/></button>
+          <button onClick={() => editor.chain().focus().setTextAlign('left').run()} className={editor.isActive({ textAlign: 'left' }) ? 'is-active' : ''}><AlignLeft size={iconSize}/></button>
+          <button onClick={() => editor.chain().focus().setTextAlign('center').run()} className={editor.isActive({ textAlign: 'center' }) ? 'is-active' : ''}><AlignCenter size={iconSize}/></button>
+          <button onClick={() => editor.chain().focus().setTextAlign('right').run()} className={editor.isActive({ textAlign: 'right' }) ? 'is-active' : ''}><AlignRight size={iconSize}/></button>
+          <button onClick={() => editor.chain().focus().setTextAlign('justify').run()} className={editor.isActive({ textAlign: 'justify' }) ? 'is-active' : ''}><AlignJustify size={iconSize}/></button>
         </div>
         <div className="tool-row">
-          <button onClick={() => editor.chain().focus().toggleBulletList().run()} className={editor.isActive('bulletList') ? 'is-active' : ''}><List size={16}/></button>
-          <button onClick={() => editor.chain().focus().toggleOrderedList().run()} className={editor.isActive('orderedList') ? 'is-active' : ''}><ListOrdered size={16}/></button>
+          <button onClick={() => editor.chain().focus().toggleBulletList().run()} className={editor.isActive('bulletList') ? 'is-active' : ''}><List size={iconSize}/></button>
+          <button onClick={() => editor.chain().focus().toggleOrderedList().run()} className={editor.isActive('orderedList') ? 'is-active' : ''}><ListOrdered size={iconSize}/></button>
         </div>
       </div>
 
@@ -75,7 +74,7 @@ const Toolbar = ({ editor }) => {
       {/* Очистка */}
       <div className="toolbar-section">
         <button onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} title="Очистить всё">
-          <Eraser size={16} />
+          <Eraser size={iconSize} />
         </button>
       </div>
     </div>
